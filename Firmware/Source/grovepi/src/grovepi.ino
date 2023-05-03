@@ -3,10 +3,12 @@
 #include "Grove_LED_Bar.h"
 #include "TM1637.h"
 #include "TimerOne.h"
+#include "Servo.h"
 #include <IRremote.h>
 #include <Wire.h>
 #include <YetAnotherPcInt.h>
 
+Servo myservo0,myservo1;
 DHT dht;
 Grove_LED_Bar ledbar[6]; // 7 instances for D2-D8, however, max 4 bars, you; can't use adjacent sockets, 4 pin display
 TM1637 fourdigit[6];     // 7 instances for D2-D8, however, max 4 displays, you; can't use adjacent sockets, 4 pin display
@@ -149,6 +151,37 @@ void processIO() {
     // Set up Analog Write
     else if (cmd[0] == 4)
       analogWrite(cmd[1], cmd[2]);
+
+    // Set up Servo Attach/Dettach
+    else if (cmd[0] == 100) {
+      pin = cmd[2];
+      if (cmd[1]==0) {
+        if (cmd[3]==1) {
+          pinMode(pin, OUTPUT);
+          myservo0.attach(pin);
+        } else {
+          myservo0.detach();
+          pinMode(pin, INPUT);
+        }
+      } else {
+        if (cmd[3]==1) {
+          pinMode(pin, OUTPUT);
+          myservo1.attach(pin);
+        } else {
+          myservo1.detach();
+          pinMode(pin, INPUT);
+        }
+
+      }
+    }
+    // Servo Write
+    else if (cmd[0] == 101) {
+      pin = cmd[2];
+      if (cmd[1]==0)
+        myservo0.write(cmd[2]);
+      else
+        myservo1.write(cmd[2]);
+    }
 
     // Set up pinMode
     else if (cmd[0] == 5)

@@ -43,7 +43,7 @@ THE SOFTWARE.
 # 			11 Nov 2016		I2C retries added for faster IO
 #							DHT function updated to look for nan's
 
-__version__ = '1.4.1'
+__version__ = '1.4.2'
 
 import sys
 import time
@@ -181,6 +181,10 @@ encoder_read_cmd = [13]
 encoder_en_cmd = [14]
 encoder_dis_cmd = [15]
 
+# servomotor command
+sAttach_cmd = [100]
+sWrite_cmd = [101]
+
 # Dust, Encoder & Flow Sensor commands
 # dust_sensor_read_cmd=[10]
 # dust_sensor_en_cmd=[14]
@@ -265,6 +269,24 @@ def analogRead(pin):
 # Write PWM
 def analogWrite(pin, value):
 	write_i2c_block(aWrite_cmd + [pin, value, unused])
+	read_i2c_block(no_bytes = 1)
+	return 1
+
+# Attach Servo
+def servoAttach(servo, pin):
+	write_i2c_block(sAttach_cmd + [servo, pin, 1])
+	read_i2c_block(no_bytes = 1)
+	return 1
+
+# Dettach Servo
+def servoDettach(servo, pin):
+	write_i2c_block(sAttach_cmd + [servo, pin, 0])
+	read_i2c_block(no_bytes = 1)
+	return 1
+
+# Write Servo
+def servoWrite(servo, value):
+	write_i2c_block(sWrite_cmd + [servo, value, unused])
 	read_i2c_block(no_bytes = 1)
 	return 1
 
