@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 #
 # GrovePi Python library
-# v1.4
+# v1.4.2
 #
 # This file provides the basic functions for using the GrovePi
 #
@@ -42,6 +42,7 @@ THE SOFTWARE.
 # Karan		13 Feb 2014  	Initial Authoring
 # 			11 Nov 2016		I2C retries added for faster IO
 #							DHT function updated to look for nan's
+# Vincent   03 Mai 2023     Add servomoteur
 
 __version__ = '1.4.2'
 
@@ -68,7 +69,7 @@ else:
 
 # Earliest version of the firmware to work with
 works_with_firmware = [
-	"1.4.0"
+	"1.4.2"
 ]
 
 # interrupt operations

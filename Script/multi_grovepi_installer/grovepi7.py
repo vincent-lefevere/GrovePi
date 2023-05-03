@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 #
 # GrovePi Python library
-# v1.4
+# v1.4.2
 #
 # This file provides the basic functions for using the GrovePi
 #
@@ -43,6 +43,7 @@ THE SOFTWARE.
 # 			11 Nov 2016		I2C retries added for faster IO
 #							DHT function updated to look for nan's
 # Nicole	16 Jan 2019		Bring to v1.4
+# Vincent   03 Mai 2023     Add servomoteur
 
 import sys
 import time
@@ -67,7 +68,7 @@ else:
 
 # Earliest version of the firmware to work with
 works_with_firmware = [
-	"1.4.0"
+	"1.4.2"
 ]
 
 # interrupt operations
@@ -180,6 +181,10 @@ encoder_read_cmd = [13]
 encoder_en_cmd = [14]
 encoder_dis_cmd = [15]
 
+# servomotor command
+sAttach_cmd = [100]
+sWrite_cmd = [101]
+
 # Dust, Encoder & Flow Sensor commands
 # dust_sensor_read_cmd=[10]
 # dust_sensor_en_cmd=[14]
@@ -196,6 +201,9 @@ encoder_dis_cmd = [15]
 
 # Write I2C block to the GrovePi
 def write_i2c_block(block, custom_timing = None):
+	'''
+	Now catches and raises Keyboard Interrupt that the user is responsible to catch.
+	'''
 	counter = 0
 	reg = block[0]
 	data = block[1:]
@@ -204,6 +212,8 @@ def write_i2c_block(block, custom_timing = None):
 			i2c.write_reg_list(reg, data)
 			time.sleep(0.002 + additional_waiting)
 			return
+		except KeyboardInterrupt:
+			raise KeyboardInterrupt
 		except:
 			counter += 1
 			time.sleep(0.003)
@@ -211,6 +221,9 @@ def write_i2c_block(block, custom_timing = None):
 
 # Read I2C block from the GrovePi
 def read_i2c_block(no_bytes = max_recv_size):
+	'''
+	Now catches and raises Keyboard Interrupt that the user is responsible to catch.
+	'''
 	data = data_not_available_cmd
 	counter = 0
 	while data[0] in [data_not_available_cmd[0], 255] and counter < 3:
@@ -219,6 +232,8 @@ def read_i2c_block(no_bytes = max_recv_size):
 			time.sleep(0.002 + additional_waiting)
 			if counter > 0:
 				counter = 0
+		except KeyboardInterrupt:
+			raise KeyboardInterrupt
 		except:
 			counter += 1
 			time.sleep(0.003)
@@ -227,7 +242,7 @@ def read_i2c_block(no_bytes = max_recv_size):
 
 def read_identified_i2c_block(read_command_id, no_bytes):
 	data = [-1]
-	while data[0] != read_command_id[0]:
+	while len(data) <= 1:
 		data = read_i2c_block(no_bytes + 1)
 
 	return data[1:]
@@ -254,6 +269,24 @@ def analogRead(pin):
 # Write PWM
 def analogWrite(pin, value):
 	write_i2c_block(aWrite_cmd + [pin, value, unused])
+	read_i2c_block(no_bytes = 1)
+	return 1
+
+# Attach Servo
+def servoAttach(servo, pin):
+	write_i2c_block(sAttach_cmd + [servo, pin, 1])
+	read_i2c_block(no_bytes = 1)
+	return 1
+
+# Dettach Servo
+def servoDettach(servo, pin):
+	write_i2c_block(sAttach_cmd + [servo, pin, 0])
+	read_i2c_block(no_bytes = 1)
+	return 1
+
+# Write Servo
+def servoWrite(servo, value):
+	write_i2c_block(sWrite_cmd + [servo, value, unused])
 	read_i2c_block(no_bytes = 1)
 	return 1
 
