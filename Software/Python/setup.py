@@ -92,7 +92,7 @@ setuptools.setup(
     # },
 
     name = "grovepi",
-    version = "1.4.2",
+    version = "1.4.2.2",
 
     description = "Drivers for using the GrovePi+ in Python",
     long_description = description,

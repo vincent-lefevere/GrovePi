@@ -8,7 +8,7 @@
 #include <Wire.h>
 #include <YetAnotherPcInt.h>
 
-Servo myservo0,myservo1;
+Servo servo[7];          // 7 instances for D2-D8
 DHT dht;
 Grove_LED_Bar ledbar[6]; // 7 instances for D2-D8, however, max 4 bars, you; can't use adjacent sockets, 4 pin display
 TM1637 fourdigit[6];     // 7 instances for D2-D8, however, max 4 displays, you; can't use adjacent sockets, 4 pin display
@@ -18,6 +18,14 @@ IRrecv irrecv;          // object to interface with the IR receiver
 decode_results results; // results for the IR receiver
 
 #define SLAVE_ADDRESS 0x04
+
+#define digital_read_cmd 1
+#define digital_write_cmd 2
+#define analog_read_cmd 3
+#define analog_write_cmd 4
+#define pinmode_cmd 5
+#define ultrasonic_read_cmd 7
+#define firmware_version_cmd 8
 
 // #define dust_sensor_read_cmd 10
 // #define dust_sensor_en_cmd 14
@@ -122,6 +130,56 @@ void setup() {
   Timer1.attachInterrupt(isr_buffer_filler, 1000);  // Buffer maintenance.
 }
 
+#define servo_cmd 101
+#define servo_param 100
+
+// Commands
+#define servo_subcmd_attach 0               // [servo_cmd, pin, 0, unused]
+#define servo_subcmd_write 1                // [servo_cmd, pin, 1, angle]
+#define servo_subcmd_detach 2               // [servo_cmd, pin, 2, unused]
+#define servo_subcmd_attached 3             // [servo_cmd, pin, 3, unused]
+#define servo_subcmd_read 4                 // [servo_cmd, pin, 4, unused]
+#define servo_subcmd_writeMicroseconds 5    // [servo_cmd, pin, 5, unused]
+#define servo_subcmd_readMicroseconds 6     // [servo_cmd, pin, 6, unused]
+#define servo_subcmd_attachMinMax 7         // [servo_cmd, pin, 7, unused]
+int servo_param0, servo_param1;
+
+void processServo() {
+  pin = cmd[1];
+  if (pin<2 || pin>8)
+    return;
+  switch(cmd[2]) {
+    case servo_subcmd_attach :
+      pinMode(pin, OUTPUT);
+      servo[pin-2].attach(pin);
+      return;
+    case servo_subcmd_attachMinMax :
+      pinMode(pin, OUTPUT);
+      servo[pin-2].attach(pin,servo_param1,servo_param0);
+      return;
+    case servo_subcmd_write :
+      servo[pin-2].write(cmd[3]);
+      return;
+    case servo_subcmd_writeMicroseconds :
+      servo[pin-2].writeMicroseconds(servo_param0);
+      return;
+    case servo_subcmd_detach :
+      servo[pin-2].detach();
+      return;
+    case servo_subcmd_attached :
+      b[1] = servo[pin-2].attached();
+      return;
+    case servo_subcmd_read :
+      b[1] = servo[pin-2].read();
+      return;
+    case servo_subcmd_readMicroseconds :
+      aRead = servo[pin-2].readMicroseconds();
+      b[1] = aRead / 256;
+      b[2] = aRead % 256;
+      return;
+  }
+}
+
 void processIO() {
   // Handles incoming data.
   // Updates sensors.
@@ -129,67 +187,41 @@ void processIO() {
 
   if (index == 4 && flag == 0) {
     flag = 1;
+    b[0] = cmd[0];
+    pin = cmd[1];
     // Digital Read
-    if (cmd[0] == 1)
-    {
-      b[0] = cmd[0];
-      b[1] = digitalRead(cmd[1]);
-    }
+    if (cmd[0] == digital_read_cmd)
+      b[1] = digitalRead(pin);
 
     // Digital Write
-    else if (cmd[0] == 2)
-      digitalWrite(cmd[1], cmd[2]);
+    else if (cmd[0] == digital_write_cmd)
+      digitalWrite(pin, cmd[2]);
 
     // Analog Read
-    else if (cmd[0] == 3) {
+    else if (cmd[0] == analog_read_cmd) {
       aRead = analogRead(cmd[1]);
-      b[0] = cmd[0];
       b[1] = aRead / 256;
       b[2] = aRead % 256;
     }
 
     // Set up Analog Write
-    else if (cmd[0] == 4)
+    else if (cmd[0] == analog_write_cmd)
       analogWrite(cmd[1], cmd[2]);
 
-    // Set up Servo Attach/Dettach
-    else if (cmd[0] == 100) {
-      pin = cmd[2];
-      if (cmd[1]==0) {
-        if (cmd[3]==1) {
-          pinMode(pin, OUTPUT);
-          myservo0.attach(pin);
-        } else {
-          myservo0.detach();
-          pinMode(pin, INPUT);
-        }
-      } else {
-        if (cmd[3]==1) {
-          pinMode(pin, OUTPUT);
-          myservo1.attach(pin);
-        } else {
-          myservo1.detach();
-          pinMode(pin, INPUT);
-        }
-
-      }
+    // Servomotor
+    else if (cmd[0] == servo_param) {
+      servo_param1=servo_param0;
+      servo_param0=(cmd[2] << 8) + cmd[3];
     }
-    // Servo Write
-    else if (cmd[0] == 101) {
-      pin = cmd[2];
-      if (cmd[1]==0)
-        myservo0.write(cmd[2]);
-      else
-        myservo1.write(cmd[2]);
-    }
+    else if (cmd[0] == servo_cmd)
+      processServo();
 
     // Set up pinMode
-    else if (cmd[0] == 5)
+    else if (cmd[0] == pinmode_cmd)
       pinMode(cmd[1], cmd[2]);
 
     // Ultrasonic Read
-    else if (cmd[0] == 7) {
-      pin = cmd[1];
+    else if (cmd[0] == ultrasonic_read_cmd) {
       pinMode(pin, OUTPUT);
       digitalWrite(pin, LOW);
       delayMicroseconds(2);
@@ -203,7 +235,6 @@ void processIO() {
       // and backwards - where the speed of sound is 343m/s
       long dur = pulseIn(pin, HIGH, 75000);
       long RangeCm = dur / 29 / 2;
-      b[0] = cmd[0];
       b[1] = RangeCm / 256;
       b[2] = RangeCm % 256;
       // Serial.println(b[1] * 256 + b[2]);
@@ -211,11 +242,10 @@ void processIO() {
       // Serial.println(b[2]);
     }
     // Firmware version
-    else if (cmd[0] == 8) {
-      b[0] = cmd[0];
+    else if (cmd[0] == firmware_version_cmd) {
       b[1] = 1;
       b[2] = 4;
-      b[3] = 0;
+      b[3] = 2;
     }
 
     // Grove temp and humidity sensor pro
@@ -223,13 +253,13 @@ void processIO() {
     else if (cmd[0] == 40) {
       if (run_once) {
         if (cmd[2] == 0)
-          dht.begin(cmd[1], DHT11);
+          dht.begin(pin, DHT11);
         else if (cmd[2] == 1)
-          dht.begin(cmd[1], DHT22);
+          dht.begin(pin, DHT22);
         else if (cmd[2] == 2)
-          dht.begin(cmd[1], DHT21);
+          dht.begin(pin, DHT21);
         else if (cmd[2] == 3)
-          dht.begin(cmd[1], AM2301);
+          dht.begin(pin, AM2301);
         float *buffer;
         buffer = dht.readTempHum();
 
@@ -312,7 +342,6 @@ void processIO() {
     // [56, pin, unused, unused]
     else if (cmd[0] == 56 && ledbar[cmd[1] - 2].ready()) {
       unsigned int state = ledbar[cmd[1] - 2].getBits();
-      b[0] = cmd[0];
       b[1] = state & 0xFF;
       b[2] = state >> 8;
     }
@@ -574,7 +603,6 @@ void processIO() {
       cmd[0] = 0;
     } else if (cmd[0] == ir_read_cmd) {
       if (irrecv.decode(&results)) {
-        b[0] = cmd[0];
         b[1] = results.decode_type;
         b[2] = results.address & 0xFF;
         b[3] = results.address >> 8;
@@ -585,11 +613,9 @@ void processIO() {
 
         irrecv.resume(); // Receive the next value
       } else {
-        b[0] = cmd[0];
         b[1] = results.decode_type;
       }
     } else if (cmd[0] == ir_read_isdata) {
-      b[0] = cmd[0];
       b[1] = irrecv.decode(&results);
     }
   } else if (cmd[0] == isr_set_cmd) {
@@ -632,7 +658,6 @@ void processIO() {
     if (run_once == 1) {
       const uint8_t pin = cmd[1]; // from pin D2->D8
       const uint32_t val = buffer[pin];
-      b[0] = cmd[0];
       b[1] = val & 0xff;
       b[2] = (val >> 8) & 0xff;
       b[3] = (val >> 16) & 0xff;
@@ -662,11 +687,9 @@ void processIO() {
           ports += (set_pcint[idx] & 0x01) << idx;
         }
 
-        b[0] = cmd[0];
         b[1] = ports & 0xff;
         b[2] = (ports >> 8) & 0xff;
       } else {
-        b[0] = cmd[0];
         b[1] = 0;
         b[2] = (set_pcint[pin] & 0x01) << pin;
       }
@@ -704,7 +727,6 @@ void processIO() {
       Serial.print(value);
       Serial.print("\n");
 
-      b[0] = cmd[0];
       b[1] = value & 0xff;
       b[2] = (value >> 8) & 0xff;
       b[3] = (value >> 16) & 0xff;
@@ -759,12 +781,12 @@ void flushI2C() {
 
 // Callback for sending data
 void sendData() {
-    if (need_extra_loop == false) {
-    if (cmd[0] == 1)
+  if (need_extra_loop == false) {
+    if (cmd[0] == digital_read_cmd)
       Wire.write((byte *)b, 2);
-    if (cmd[0] == 3 || cmd[0] == 7 || cmd[0] == 56)
+    if (cmd[0] == analog_read_cmd || cmd[0] == ultrasonic_read_cmd || cmd[0] == 56 || cmd[0] == servo_cmd)
       Wire.write((byte *)b, 3);
-    if (cmd[0] == 8 || cmd[0] == 20)
+    if (cmd[0] == firmware_version_cmd || cmd[0] == 20)
       Wire.write((byte *)b, 4);
     if (cmd[0] == 30)
       Wire.write((byte *)b, 9);

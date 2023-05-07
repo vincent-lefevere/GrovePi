@@ -183,8 +183,8 @@ encoder_en_cmd = [14]
 encoder_dis_cmd = [15]
 
 # servomotor command
-sAttach_cmd = [100]
-sWrite_cmd = [101]
+servo_cmd = [101]
+servo_param = [100]
 
 # Dust, Encoder & Flow Sensor commands
 # dust_sensor_read_cmd=[10]
@@ -266,7 +266,6 @@ def analogRead(pin):
 	number = read_identified_i2c_block(aRead_cmd, no_bytes = 2)
 	return number[0] * 256 + number[1]
 
-
 # Write PWM
 def analogWrite(pin, value):
 	write_i2c_block(aWrite_cmd + [pin, value, unused])
@@ -274,22 +273,57 @@ def analogWrite(pin, value):
 	return 1
 
 # Attach Servo
-def servoAttach(servo, pin):
-	write_i2c_block(sAttach_cmd + [servo, pin, 1])
+
+def servoAttach(pin):
+	write_i2c_block(servo_cmd + [pin, 0, unused])
+	read_i2c_block(no_bytes = 1)
+	return 1
+
+def servoAttachMinMax(pin, min, max):
+	write_i2c_block(servo_param + [unused, min//256, min%256])
+	read_i2c_block(no_bytes = 1)
+	write_i2c_block(servo_param + [unused, max//256, max%256])
+	read_i2c_block(no_bytes = 1)
+	write_i2c_block(servo_cmd + [7, pin, unused])
 	read_i2c_block(no_bytes = 1)
 	return 1
 
 # Dettach Servo
-def servoDettach(servo, pin):
-	write_i2c_block(sAttach_cmd + [servo, pin, 0])
+def servoDetach(pin):
+	write_i2c_block(servo_cmd + [pin, 2, unused])
 	read_i2c_block(no_bytes = 1)
 	return 1
 
 # Write Servo
-def servoWrite(servo, value):
-	write_i2c_block(sWrite_cmd + [servo, value, unused])
+def servoWrite(pin, angle):
+	write_i2c_block(servo_cmd + [pin, 1, angle])
 	read_i2c_block(no_bytes = 1)
 	return 1
+
+# WriteMicroseconds Servo
+def servoWriteMicroseconds(pin, t):
+	write_i2c_block(servo_param + [unused, t//256, t%256])
+	read_i2c_block(no_bytes = 1)
+	write_i2c_block(servo_cmd + [5, pin, unused])
+	read_i2c_block(no_bytes = 1)
+	return 1
+
+# Attached Servo
+def servoAttached(pin):
+	write_i2c_block(servo_cmd + [pin, 3, unused])
+	return read_identified_i2c_block( servo_cmd, no_bytes = 1)[0]
+
+# Read Servo
+def servoRead(pin):
+	write_i2c_block(servo_cmd + [pin, 4, unused])
+	angle = read_identified_i2c_block( servo_cmd, no_bytes = 1)[0]
+	return angle
+
+# ReadMicroseconds Servo
+def servoReadMicroseconds(pin):
+	write_i2c_block(servo_cmd + [pin, 6, unused])
+	data = read_identified_i2c_block( servo_cmd, no_bytes = 2)
+	return (data[0] * 256 + data[1])
 
 # Setting Up Pin mode on Arduino
 def pinMode(pin, mode):
