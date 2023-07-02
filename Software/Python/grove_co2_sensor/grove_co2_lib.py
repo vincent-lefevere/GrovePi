@@ -34,7 +34,7 @@ class CO2:
     
     def __init__(self):	
         #To open the raspberry serial port
-                ser = serial.Serial('/dev/serial0', 9600, timeout = 1)	#Open the serial port at 9600 baud
+        ser = serial.Serial('/dev/serial0', 9600, timeout = 1)	#Open the serial port at 9600 baud
 
         #init serial
         ser.flush()
